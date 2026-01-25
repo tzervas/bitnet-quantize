@@ -2,7 +2,7 @@
 name = "bitnet-quantize"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.92"
+rust-version = "1.70"
 license = "MIT"
 authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
 description = "Microsoft BitNet b1.58 quantization and inference for Rust"
