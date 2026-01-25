@@ -1,6 +1,6 @@
 [package]
 name = "bitnet-quantize"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.92"
 license = "MIT"
@@ -20,7 +20,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 # Sister crate dependencies
-trit-vsa = "0.1.0"
+trit-vsa = { version = "0.2.0", path = "../trit-vsa" }
 peft-rs = { version = "1.0.0", optional = true }
 qlora-rs = { version = "1.0.0", optional = true }
 
