@@ -67,7 +67,10 @@ impl QuantizedActivations {
 /// # Errors
 ///
 /// Returns error if quantization fails.
-pub fn quantize_activations(activations: &Tensor, config: &BitNetConfig) -> Result<QuantizedActivations> {
+pub fn quantize_activations(
+    activations: &Tensor,
+    config: &BitNetConfig,
+) -> Result<QuantizedActivations> {
     let shape = activations.shape().dims().to_vec();
 
     // Handle both 2D [batch, hidden] and 3D [batch, seq, hidden] inputs

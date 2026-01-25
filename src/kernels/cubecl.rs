@@ -88,7 +88,8 @@ fn absmean_quantize_kernel<F: Float>(
     let mut stride: u32 = 128;
     while stride > 0 {
         if tid < stride && (tid + stride) < block_size {
-            shared_sum[tid as usize] = shared_sum[tid as usize] + shared_sum[(tid + stride) as usize];
+            shared_sum[tid as usize] =
+                shared_sum[tid as usize] + shared_sum[(tid + stride) as usize];
         }
         sync_cube();
         stride = stride / 2;
@@ -422,7 +423,11 @@ fn bitlinear_forward_kernel<F: Float>(
         let trit = weights[(weight_base + i) as usize];
 
         // Ternary accumulate
-        acc = select(trit == 1, acc + normed_val, select(trit == -1, acc - normed_val, acc));
+        acc = select(
+            trit == 1,
+            acc + normed_val,
+            select(trit == -1, acc - normed_val, acc),
+        );
         i = i + 1;
     }
 
@@ -474,10 +479,7 @@ pub fn absmean_quantize(weight: &Tensor) -> std::result::Result<(Tensor, Tensor)
     // Fall back to CPU computation with GPU tensor creation for now
     // TODO: Implement full CubeCL launch when cubecl-cuda runtime is stabilized
 
-    let weight_f32: Vec<f32> = weight
-        .to_dtype(DType::F32)?
-        .flatten_all()?
-        .to_vec1()?;
+    let weight_f32: Vec<f32> = weight.to_dtype(DType::F32)?.flatten_all()?.to_vec1()?;
 
     let mut quantized = vec![0i32; out_features * in_features];
     let mut scales = vec![0.0f32; out_features];
@@ -505,8 +507,7 @@ pub fn absmean_quantize(weight: &Tensor) -> std::result::Result<(Tensor, Tensor)
     }
 
     // Create GPU tensors
-    let quantized_tensor =
-        Tensor::from_vec(quantized, (out_features, in_features), device)?;
+    let quantized_tensor = Tensor::from_vec(quantized, (out_features, in_features), device)?;
     let scales_tensor = Tensor::from_vec(scales, out_features, device)?;
 
     Ok((quantized_tensor, scales_tensor))
@@ -524,7 +525,10 @@ pub fn absmean_quantize(weight: &Tensor) -> std::result::Result<(Tensor, Tensor)
 /// # Returns
 ///
 /// Dequantized float tensor [out_features, in_features]
-pub fn ternary_dequantize(ternary: &Tensor, scales: &Tensor) -> std::result::Result<Tensor, BitNetError> {
+pub fn ternary_dequantize(
+    ternary: &Tensor,
+    scales: &Tensor,
+) -> std::result::Result<Tensor, BitNetError> {
     let _device = ternary.device();
     let (out_features, _in_features) = ternary.dims2()?;
 
@@ -549,7 +553,10 @@ pub fn ternary_dequantize(ternary: &Tensor, scales: &Tensor) -> std::result::Res
 /// # Errors
 ///
 /// Returns error if CUDA operation fails.
-pub fn ternary_matmul_gpu(input: &Tensor, weight: &TernaryWeight) -> std::result::Result<Tensor, BitNetError> {
+pub fn ternary_matmul_gpu(
+    input: &Tensor,
+    weight: &TernaryWeight,
+) -> std::result::Result<Tensor, BitNetError> {
     let device = input.device();
 
     // Dequantize weights and perform standard matmul
@@ -632,8 +639,7 @@ pub fn pack_ternary_weights(ternary: &Tensor) -> std::result::Result<Tensor, Bit
         }
     }
 
-    let packed_tensor =
-        Tensor::from_vec(packed, (out_features, packed_per_row), device)?;
+    let packed_tensor = Tensor::from_vec(packed, (out_features, packed_per_row), device)?;
     Ok(packed_tensor)
 }
 
@@ -678,14 +684,14 @@ pub fn packed_ternary_matmul(
 /// # Returns
 ///
 /// Ternary tensor [out_features, in_features] as i32
-pub fn unpack_ternary_weights(packed: &Tensor, in_features: usize) -> std::result::Result<Tensor, BitNetError> {
+pub fn unpack_ternary_weights(
+    packed: &Tensor,
+    in_features: usize,
+) -> std::result::Result<Tensor, BitNetError> {
     let (out_features, packed_per_row) = packed.dims2()?;
     let device = packed.device();
 
-    let packed_u32: Vec<u32> = packed
-        .to_dtype(DType::U32)?
-        .flatten_all()?
-        .to_vec1()?;
+    let packed_u32: Vec<u32> = packed.to_dtype(DType::U32)?.flatten_all()?.to_vec1()?;
 
     let trits_per_word = 16usize;
     let mut ternary = vec![0i32; out_features * in_features];
@@ -708,8 +714,7 @@ pub fn unpack_ternary_weights(packed: &Tensor, in_features: usize) -> std::resul
         }
     }
 
-    let ternary_tensor =
-        Tensor::from_vec(ternary, (out_features, in_features), device)?;
+    let ternary_tensor = Tensor::from_vec(ternary, (out_features, in_features), device)?;
     Ok(ternary_tensor)
 }
 

@@ -76,7 +76,11 @@ impl BitLinear {
     /// # Errors
     ///
     /// Returns error if weight quantization fails.
-    pub fn from_weight(weight: &Tensor, bias: Option<&Tensor>, config: &BitNetConfig) -> Result<Self> {
+    pub fn from_weight(
+        weight: &Tensor,
+        bias: Option<&Tensor>,
+        config: &BitNetConfig,
+    ) -> Result<Self> {
         config.validate()?;
 
         let device = weight.device().clone();

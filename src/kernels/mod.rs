@@ -27,18 +27,18 @@ mod cubecl;
 pub use cubecl::{
     // Core operations
     absmean_quantize,
-    ternary_dequantize,
-    ternary_matmul_gpu,
-    ternary_matmul_raw,
-    // Packed operations
-    pack_ternary_weights,
-    packed_ternary_matmul,
-    unpack_ternary_weights,
     // Fused operations
     bitlinear_forward,
     // Utilities
     has_cuda_support,
+    // Packed operations
+    pack_ternary_weights,
+    packed_ternary_matmul,
     should_use_gpu,
+    ternary_dequantize,
+    ternary_matmul_gpu,
+    ternary_matmul_raw,
+    unpack_ternary_weights,
 };
 
 /// Check if CUDA kernels are available.

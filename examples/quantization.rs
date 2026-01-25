@@ -26,9 +26,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Original mean(|W|): {:.4}", orig_mean);
 
     let quantized_weights = quantize_weights(&weights, &config)?;
-    println!("   Quantized weight sparsity: {:.1}%", quantized_weights.sparsity() * 100.0);
-    println!("   Compression ratio: {:.2}x", quantized_weights.compression_ratio());
-    println!("   Number of scale groups: {}", quantized_weights.scales.len());
+    println!(
+        "   Quantized weight sparsity: {:.1}%",
+        quantized_weights.sparsity() * 100.0
+    );
+    println!(
+        "   Compression ratio: {:.2}x",
+        quantized_weights.compression_ratio()
+    );
+    println!(
+        "   Number of scale groups: {}",
+        quantized_weights.scales.len()
+    );
 
     let restored_weights = dequantize_weights(&quantized_weights, &device)?;
     println!("   Restored weight shape: {:?}", restored_weights.shape());
@@ -55,7 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Per-token scales: {:?}", quantized_acts.scales);
 
     // Check that values are in INT8 range
-    let in_range = quantized_acts.data.iter().all(|&x| (-127..=127).contains(&(x as i16)));
+    let in_range = quantized_acts
+        .data
+        .iter()
+        .all(|&x| (-127..=127).contains(&(x as i16)));
     println!("   All values in [-127, 127]: {}", in_range);
 
     let restored_acts = dequantize_activations(&quantized_acts, &device)?;
@@ -74,8 +86,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scale_bytes = quantized_weights.scales.len() * 4; // FP32 scales
     let total_quant_bytes = quant_weight_bits / 8 + scale_bytes;
     println!("   Original weight size: {} bytes", orig_weight_bytes);
-    println!("   Quantized weight size: {} bytes (incl. scales)", total_quant_bytes);
-    println!("   Actual compression: {:.2}x", orig_weight_bytes as f32 / total_quant_bytes as f32);
+    println!(
+        "   Quantized weight size: {} bytes (incl. scales)",
+        total_quant_bytes
+    );
+    println!(
+        "   Actual compression: {:.2}x",
+        orig_weight_bytes as f32 / total_quant_bytes as f32
+    );
 
     println!("\nDone!");
     Ok(())

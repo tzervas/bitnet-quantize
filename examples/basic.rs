@@ -44,7 +44,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mean: f32 = output_vec.iter().sum::<f32>() / output_vec.len() as f32;
     let max = output_vec.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let min = output_vec.iter().cloned().fold(f32::INFINITY, f32::min);
-    println!("   Output stats: mean={:.4}, min={:.4}, max={:.4}", mean, min, max);
+    println!(
+        "   Output stats: mean={:.4}, min={:.4}, max={:.4}",
+        mean, min, max
+    );
 
     // 3D input (batch, seq_len, hidden)
     println!("\n4. 3D input (sequence model)");

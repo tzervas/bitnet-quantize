@@ -103,9 +103,9 @@ mod tests {
         // Should be clamped to {-1, 0, 1}
         assert_eq!(result[0], -1.0); // -2.0 -> -1
         assert_eq!(result[1], -1.0); // -0.5 rounds to -1
-        assert_eq!(result[2], 0.0);  // 0 stays 0
-        assert_eq!(result[3], 1.0);  // 0.5 rounds to 1
-        assert_eq!(result[4], 1.0);  // 2.0 -> 1
+        assert_eq!(result[2], 0.0); // 0 stays 0
+        assert_eq!(result[3], 1.0); // 0.5 rounds to 1
+        assert_eq!(result[4], 1.0); // 2.0 -> 1
     }
 
     #[test]
