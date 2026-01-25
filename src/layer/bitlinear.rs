@@ -10,12 +10,17 @@ use crate::quantization::{
     TernaryWeight,
 };
 
+/// Emit a warning when CPU fallback is used.
+///
+/// GPU (CUDA) is the intended default for BitNet operations.
+/// This function warns users once per process when CPU is being used.
 fn warn_cpu_fallback(device: &Device) {
     static WARN_ONCE: std::sync::Once = std::sync::Once::new();
     if matches!(device, Device::Cpu) {
         WARN_ONCE.call_once(|| {
             eprintln!(
-                "bitnet-quantize: CPU device in use. CUDA is the intended default; enable the 'cuda' feature and use Device::cuda_if_available(0) when possible."
+                "bitnet-quantize: CPU device in use. CUDA is the intended default; \
+                 enable the 'cuda' feature and use Device::cuda_if_available(0) when possible."
             );
         });
     }
@@ -162,9 +167,12 @@ impl BitLinear {
     ///
     /// This method:
     /// 1. Quantizes input activations to INT8
-    /// 2. Dequantizes weights for matmul (or uses optimized kernel)
+    /// 2. Uses GPU-optimized ternary matmul if available, otherwise dequantizes
     /// 3. Performs the linear transformation
     /// 4. Adds bias if present
+    ///
+    /// When the `cuda` feature is enabled and a CUDA device is detected,
+    /// this uses optimized GPU kernels that exploit ternary weight sparsity.
     ///
     /// # Arguments
     ///
@@ -178,11 +186,24 @@ impl BitLinear {
         let quantized_input = quantize_activations(input, &self.config)?;
         let dequant_input = dequantize_activations(&quantized_input, &self.device)?;
 
-        // Dequantize weights for matmul
-        let dequant_weight = dequantize_weights(&self.weight, &self.device)?;
+        // Try GPU-optimized ternary matmul if available
+        #[cfg(feature = "cuda")]
+        let output = {
+            if crate::kernels::should_use_gpu(&dequant_input, &self.weight) {
+                crate::kernels::ternary_matmul_gpu(&dequant_input, &self.weight)?
+            } else {
+                // Fallback to standard matmul
+                let dequant_weight = dequantize_weights(&self.weight, &self.device)?;
+                dequant_input.matmul(&dequant_weight.t()?)?
+            }
+        };
 
-        // Linear transformation: y = x @ W^T
-        let output = dequant_input.matmul(&dequant_weight.t()?)?;
+        #[cfg(not(feature = "cuda"))]
+        let output = {
+            // Standard dequantize + matmul path
+            let dequant_weight = dequantize_weights(&self.weight, &self.device)?;
+            dequant_input.matmul(&dequant_weight.t()?)?
+        };
 
         // Add bias
         let output = if let Some(ref bias) = self.bias {
@@ -197,23 +218,50 @@ impl BitLinear {
 
 impl Module for BitLinear {
     fn forward(&self, input: &Tensor) -> candle_core::Result<Tensor> {
-        // For standard forward, dequantize and compute
-        // In a production implementation, this would use optimized kernels
-        let dequant_weight = dequantize_weights(&self.weight, &self.device)
-            .map_err(|e| candle_core::Error::Msg(e.to_string()))?;
-
         let dims = input.dims();
-        let output = if dims.len() == 3 {
-            // Handle 3D input [batch, seq_len, hidden]
+
+        // Handle 3D input [batch, seq_len, hidden] by flattening
+        let (flat_input, original_shape) = if dims.len() == 3 {
             let (batch, seq_len, hidden) = (dims[0], dims[1], dims[2]);
-            let flat_input = input.reshape((batch * seq_len, hidden))?;
-            let flat_output = flat_input.matmul(&dequant_weight.t()?)?;
-            flat_output.reshape((batch, seq_len, self.out_features()))?
+            (
+                input.reshape((batch * seq_len, hidden))?,
+                Some((batch, seq_len)),
+            )
         } else {
-            // Standard 2D matmul
-            input.matmul(&dequant_weight.t()?)?
+            (input.clone(), None)
         };
 
+        // Use GPU-optimized ternary matmul if available
+        #[cfg(feature = "cuda")]
+        let output = {
+            if crate::kernels::cuda_available()
+                && crate::kernels::should_use_gpu(&flat_input, &self.weight)
+            {
+                crate::kernels::ternary_matmul_gpu(&flat_input, &self.weight)
+                    .map_err(|e| candle_core::Error::Msg(e.to_string()))?
+            } else {
+                // Fallback to standard dequantize + matmul
+                let dequant_weight = dequantize_weights(&self.weight, &self.device)
+                    .map_err(|e| candle_core::Error::Msg(e.to_string()))?;
+                flat_input.matmul(&dequant_weight.t()?)?
+            }
+        };
+
+        #[cfg(not(feature = "cuda"))]
+        let output = {
+            let dequant_weight = dequantize_weights(&self.weight, &self.device)
+                .map_err(|e| candle_core::Error::Msg(e.to_string()))?;
+            flat_input.matmul(&dequant_weight.t()?)?
+        };
+
+        // Reshape back to 3D if needed
+        let output = if let Some((batch, seq_len)) = original_shape {
+            output.reshape((batch, seq_len, self.out_features()))?
+        } else {
+            output
+        };
+
+        // Add bias
         let output = if let Some(ref bias) = self.bias {
             output.broadcast_add(bias)?
         } else {

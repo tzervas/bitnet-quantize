@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-25
+
+### Changed
+- Migrated CubeCL kernels to 0.9 API
+- Fixed Result type collision by using std::result::Result explicitly
+- Replace early returns with `terminate!()` macro
+- Update math functions to use trait methods (`F::floor()`, `F::sqrt()`)
+- Added `usize` suffix to SharedMemory::new() calls
+- Added proper usize casts at array index sites
+- Wrapped kernel launches in unsafe blocks with SAFETY comments
+
+### Known Limitations
+- GPU kernel launches not yet integrated into public API (CPU fallback used)
+- Kernel definitions ready for future GPU integration
+
 ## [0.1.1] - 2026-01-24
 
 ### Added
