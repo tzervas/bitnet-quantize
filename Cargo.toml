@@ -1,0 +1,42 @@
+[package]
+name = "bitnet-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+license = "MIT"
+authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
+description = "Microsoft BitNet b1.58 quantization and inference for Rust"
+repository = "https://github.com/tzervas/bitnet-rs"
+homepage = "https://github.com/tzervas/bitnet-rs"
+documentation = "https://docs.rs/bitnet-rs"
+keywords = ["bitnet", "quantization", "ternary", "llm", "inference"]
+categories = ["science", "mathematics"]
+
+[dependencies]
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Sister crate dependencies
+ternary-rs = { path = "../ternary-rs" }
+peft-rs = { git = "https://github.com/tzervas/peft-rs", optional = true }
+qlora-rs = { git = "https://github.com/tzervas/qlora-rs", optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = "1.4"
+
+[features]
+default = []
+cuda = ["candle-core/cuda"]
+peft = ["dep:peft-rs"]
+gguf-export = ["dep:qlora-rs"]
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "bitnet_ops"
+harness = false
