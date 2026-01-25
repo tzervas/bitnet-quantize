@@ -224,9 +224,9 @@ mod tests {
 
         let quantized = quantize_activations(&activations, &config).unwrap();
 
-        // All quantized values should be in [-127, 127]
+        // All quantized values should be in [-127, 127] (i8 type enforces upper bound)
         for &val in &quantized.data {
-            assert!(val >= -127 && val <= 127);
+            assert!(val >= -127, "value {val} below -127");
         }
     }
 

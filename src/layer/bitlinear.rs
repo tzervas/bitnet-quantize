@@ -10,6 +10,17 @@ use crate::quantization::{
     TernaryWeight,
 };
 
+fn warn_cpu_fallback(device: &Device) {
+    static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+    if matches!(device, Device::Cpu) {
+        WARN_ONCE.call_once(|| {
+            eprintln!(
+                "bitnet-quantize: CPU device in use. CUDA is the intended default; enable the 'cuda' feature and use Device::cuda_if_available(0) when possible."
+            );
+        });
+    }
+}
+
 /// BitLinear layer with ternary weights and INT8 activations.
 ///
 /// This is a drop-in replacement for `candle_nn::Linear` that uses:
@@ -64,6 +75,7 @@ impl BitLinear {
         config.validate()?;
 
         let device = weight.device().clone();
+        warn_cpu_fallback(&device);
         let quantized_weight = quantize_weights(weight, config)?;
 
         Ok(Self {
@@ -89,6 +101,7 @@ impl BitLinear {
         config: BitNetConfig,
         device: Device,
     ) -> Self {
+        warn_cpu_fallback(&device);
         Self {
             weight,
             bias,

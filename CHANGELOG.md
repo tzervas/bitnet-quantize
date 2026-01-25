@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-01-24
+
+### Added
+- CPU fallback warning when CUDA is unavailable
+
+### Changed
+- Bumped minimum Rust version to 1.92
+- Documentation link fixes and formatting cleanup
+
 ## [0.1.0] - 2026-01-24
 
 ### Added
@@ -43,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 
 - Built on candle 0.9.x tensor library
-- Minimum Rust version: 1.70
+- Minimum Rust version: 1.92
 - Optional dependencies gated behind feature flags
 - Integration with rust-ai workspace
 
