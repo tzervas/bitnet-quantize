@@ -1,14 +1,14 @@
-# bitnet-rs
+# bitnet-quantize
 
 Microsoft BitNet b1.58 implementation in Rust with ternary weight quantization.
 
-[![Crates.io](https://img.shields.io/crates/v/bitnet-rs.svg)](https://crates.io/crates/bitnet-rs)
-[![Documentation](https://docs.rs/bitnet-rs/badge.svg)](https://docs.rs/bitnet-rs)
+[![Crates.io](https://img.shields.io/crates/v/bitnet-quantize.svg)](https://crates.io/crates/bitnet-quantize)
+[![Documentation](https://docs.rs/bitnet-quantize/badge.svg)](https://docs.rs/bitnet-quantize)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Overview
 
-`bitnet-rs` implements the BitNet b1.58 architecture for efficient neural network inference:
+`bitnet-quantize` implements the BitNet b1.58 architecture for efficient neural network inference:
 
 - **Ternary Weights**: Quantized to {-1, 0, +1} using AbsMean
 - **INT8 Activations**: Per-token AbsMax quantization
@@ -23,14 +23,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bitnet-rs = "0.1"
+bitnet-quantize = "0.1"
 ```
 
 ### Optional Features
 
 ```toml
 [dependencies]
-bitnet-rs = { version = "0.1", features = ["cuda", "peft", "gguf-export"] }
+bitnet-quantize = { version = "0.1", features = ["cuda", "peft", "gguf-export"] }
 ```
 
 | Feature | Description |
@@ -42,7 +42,7 @@ bitnet-rs = { version = "0.1", features = ["cuda", "peft", "gguf-export"] }
 ## Quick Start
 
 ```rust
-use bitnet_rs::{BitLinear, BitNetConfig};
+use bitnet_quantize::{BitLinear, BitNetConfig};
 use candle_core::{Device, Tensor};
 use candle_nn::Module;
 
@@ -99,7 +99,7 @@ X_q = round(X * 127 / max(|X|))  clamped to [-127, +127]
 ## Configuration
 
 ```rust
-use bitnet_rs::BitNetConfig;
+use bitnet_quantize::BitNetConfig;
 
 let config = BitNetConfig::builder()
     .group_size(128)           // Weights per scale group
@@ -114,7 +114,7 @@ let config = BitNetConfig::builder()
 The Straight-Through Estimator enables training through quantization:
 
 ```rust
-use bitnet_rs::layer::{ternary_ste, int8_ste};
+use bitnet_quantize::layer::{ternary_ste, int8_ste};
 
 // Forward: quantize to ternary
 let quantized = ternary_ste(&weights)?;
@@ -128,7 +128,7 @@ let quantized = ternary_ste(&weights)?;
 Use BitNet as a PEFT adapter:
 
 ```rust
-use bitnet_rs::BitNetAdapter;
+use bitnet_quantize::BitNetAdapter;
 use peft_rs::Adapter;
 
 let adapter = BitNetAdapter::new(config)?;
@@ -148,12 +148,12 @@ Benchmarks on CPU (Intel i7):
 Run benchmarks:
 
 ```bash
-cargo bench -p bitnet-rs
+cargo bench -p bitnet-quantize
 ```
 
 ## Documentation
 
-Full API documentation: [docs.rs/bitnet-rs](https://docs.rs/bitnet-rs)
+Full API documentation: [docs.rs/bitnet-quantize](https://docs.rs/bitnet-quantize)
 
 ## References
 

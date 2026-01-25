@@ -2,12 +2,12 @@
 //!
 //! Run with: `cargo run --example basic`
 
-use bitnet_rs::{BitLinear, BitNetConfig};
+use bitnet_quantize::{BitLinear, BitNetConfig};
 use candle_core::{Device, Tensor};
 use candle_nn::Module;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== BitNet-rs Basic Example ===\n");
+    println!("=== bitnet-quantize Basic Example ===\n");
 
     let device = Device::Cpu;
 

@@ -1,14 +1,14 @@
 [package]
-name = "bitnet-rs"
+name = "bitnet-quantize"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.92"
 license = "MIT"
 authors = ["Tyler Zervas <tz-dev@vectorweight.com>"]
 description = "Microsoft BitNet b1.58 quantization and inference for Rust"
-repository = "https://github.com/tzervas/bitnet-rs"
-homepage = "https://github.com/tzervas/bitnet-rs"
-documentation = "https://docs.rs/bitnet-rs"
+repository = "https://github.com/tzervas/bitnet-quantize"
+homepage = "https://github.com/tzervas/bitnet-quantize"
+documentation = "https://docs.rs/bitnet-quantize"
 keywords = ["bitnet", "quantization", "ternary", "llm", "inference"]
 categories = ["science", "mathematics"]
 
@@ -20,7 +20,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 # Sister crate dependencies
-ternary-rs = { path = "../ternary-rs" }
+trit-vsa = { path = "../ternary-rs" }
 peft-rs = { git = "https://github.com/tzervas/peft-rs", optional = true }
 qlora-rs = { git = "https://github.com/tzervas/qlora-rs", optional = true }
 

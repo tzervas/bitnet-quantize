@@ -52,5 +52,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BitNet b1.58: "The Era of 1-bit LLMs" (Ma et al., 2024)
 - Original BitNet: "Scaling 1-bit Transformers" (Wang et al., 2023)
 
-[Unreleased]: https://github.com/your-org/bitnet-rs/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-org/bitnet-rs/releases/tag/v0.1.0
+[Unreleased]: https://github.com/your-org/bitnet-quantize/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/your-org/bitnet-quantize/releases/tag/v0.1.0

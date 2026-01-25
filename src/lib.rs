@@ -7,7 +7,7 @@
 //! # Features
 //!
 //! - `BitLinear`: Drop-in replacement for `nn::Linear`
-//! - Efficient ternary weight storage via `ternary-rs`
+//! - Efficient ternary weight storage via `trit-vsa`
 //! - Straight-Through Estimator (STE) for training
 //! - Optional peft-rs adapter integration
 //! - Optional GGUF export via qlora-rs
@@ -15,7 +15,7 @@
 //! # Quick Start
 //!
 //! ```ignore
-//! use bitnet_rs::{BitLinear, BitNetConfig};
+//! use bitnet_quantize::{BitLinear, BitNetConfig};
 //! use candle_core::{Device, Tensor};
 //!
 //! let device = Device::Cpu;

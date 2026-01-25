@@ -40,7 +40,7 @@ pub enum BitNetError {
 
     /// Ternary operation error.
     #[error("ternary error: {0}")]
-    Ternary(#[from] ternary_rs::TernaryError),
+    Ternary(#[from] trit_vsa::TernaryError),
 
     /// I/O error.
     #[error("I/O error: {0}")]

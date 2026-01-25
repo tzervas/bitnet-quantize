@@ -1,11 +1,11 @@
-# bitnet-rs Development Guide
+# bitnet-quantize Development Guide
 
 Microsoft BitNet b1.58 implementation for the rust-ai workspace.
 
 ## Architecture Overview
 
 ```
-bitnet-rs/
+bitnet-quantize/
 ├── src/
 │   ├── lib.rs              # Public API, crate docs
 │   ├── error.rs            # BitNetError enum
@@ -70,22 +70,22 @@ fn ste_backward(grad: Tensor) -> Tensor {
 
 ```bash
 # Run all tests
-cargo test -p bitnet-rs
+cargo test -p bitnet-quantize
 
 # Test with peft feature
-cargo test -p bitnet-rs --features peft
+cargo test -p bitnet-quantize --features peft
 
 # Test with CUDA (requires GPU)
-cargo test -p bitnet-rs --features cuda -- --ignored
+cargo test -p bitnet-quantize --features cuda -- --ignored
 
 # Check for warnings
-cargo clippy -p bitnet-rs -- -W clippy::pedantic
+cargo clippy -p bitnet-quantize -- -W clippy::pedantic
 
 # Run benchmarks
-cargo bench -p bitnet-rs
+cargo bench -p bitnet-quantize
 
 # Generate docs
-cargo doc -p bitnet-rs --no-deps --open
+cargo doc -p bitnet-quantize --no-deps --open
 ```
 
 ## Feature Flags
@@ -115,9 +115,9 @@ cargo doc -p bitnet-rs --no-deps --open
 
 ## Integration Points
 
-### With ternary-rs
+### With trit-vsa
 
-Uses `ternary-rs` for low-level ternary storage and arithmetic.
+Uses `trit-vsa` for low-level ternary storage and arithmetic.
 The `TernaryWeight` struct wraps packed ternary data.
 
 ### With peft-rs
@@ -160,4 +160,4 @@ When `gguf-export` feature is enabled:
 
 - Minimum Rust: 1.92
 - Candle version: 0.9.x
-- Workspace dependencies: ternary-rs, peft-rs (optional), qlora-rs (optional)
+- Workspace dependencies: trit-vsa, peft-rs (optional), qlora-rs (optional)

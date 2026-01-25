@@ -4,7 +4,7 @@
 
 use candle_core::{Device, Tensor};
 use serde::{Deserialize, Serialize};
-use ternary_rs::PackedTritVec;
+use trit_vsa::PackedTritVec;
 
 use crate::config::BitNetConfig;
 use crate::error::{BitNetError, Result};
@@ -141,7 +141,7 @@ pub fn quantize_weights(weight: &Tensor, config: &BitNetConfig) -> Result<Ternar
             for (i, &val) in group.iter().enumerate() {
                 let normalized = val / scale;
                 let quantized = normalized.round().clamp(-1.0, 1.0) as i8;
-                let trit = ternary_rs::Trit::from_value(quantized as i32)?;
+                let trit = trit_vsa::Trit::from_value(quantized as i32)?;
                 packed.set(start + i, trit);
             }
         }
@@ -235,8 +235,8 @@ mod tests {
         // Check that signs are preserved
         // Row 0: [1, -1, 0.5, -0.5] -> scale = (1+1+0.5+0.5)/4 = 0.75
         // Normalized: [1.33, -1.33, 0.67, -0.67] -> [+1, -1, +1, -1]
-        assert_eq!(ternary.data[0].get(0), ternary_rs::Trit::P);
-        assert_eq!(ternary.data[0].get(1), ternary_rs::Trit::N);
+        assert_eq!(ternary.data[0].get(0), trit_vsa::Trit::P);
+        assert_eq!(ternary.data[0].get(1), trit_vsa::Trit::N);
     }
 
     #[test]

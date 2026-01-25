@@ -2,14 +2,14 @@
 //!
 //! Run with: `cargo run --example quantization`
 
-use bitnet_rs::{
+use bitnet_quantize::{
     dequantize_activations, dequantize_weights, quantize_activations, quantize_weights,
     BitNetConfig,
 };
 use candle_core::{Device, Tensor};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== BitNet-rs Quantization Example ===\n");
+    println!("=== bitnet-quantize Quantization Example ===\n");
 
     let device = Device::Cpu;
     let config = BitNetConfig::default().with_group_size(64);
