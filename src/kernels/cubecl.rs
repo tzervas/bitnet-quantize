@@ -21,10 +21,9 @@
 
 use candle_core::{DType, Device, Tensor};
 use cubecl::prelude::*;
-use cubecl_cuda::CudaRuntime;
 
 use crate::config::BitNetConfig;
-use crate::error::{BitNetError, Result};
+use crate::error::BitNetError;
 use crate::quantization::TernaryWeight;
 
 // ============================================================================
@@ -32,6 +31,7 @@ use crate::quantization::TernaryWeight;
 // ============================================================================
 
 /// Default block size for kernel launches
+#[allow(dead_code)]
 const BLOCK_SIZE: u32 = 256;
 
 /// Tile size for tiled matmul
@@ -67,13 +67,13 @@ fn absmean_quantize_kernel<F: Float>(
     let row_start = row * in_features;
 
     // Shared memory for reduction (fixed size for CubeCL)
-    let mut shared_sum = SharedMemory::<F>::new(256);
+    let mut shared_sum = SharedMemory::<F>::new(256usize);
 
     // Phase 1: Compute sum of absolute values via parallel reduction
     let mut local_sum = F::new(0.0);
     let mut i = tid;
     while i < in_features {
-        let val = weight[row_start + i];
+        let val = weight[(row_start + i) as usize];
         // Manual abs: val < 0 ? -val : val
         let abs_val = select(val < F::new(0.0), F::new(0.0) - val, val);
         local_sum = local_sum + abs_val;
@@ -81,14 +81,14 @@ fn absmean_quantize_kernel<F: Float>(
     }
 
     // Store local sum for reduction
-    shared_sum[tid] = local_sum;
+    shared_sum[tid as usize] = local_sum;
     sync_cube();
 
     // Tree reduction for sum
     let mut stride: u32 = 128;
     while stride > 0 {
         if tid < stride && (tid + stride) < block_size {
-            shared_sum[tid] = shared_sum[tid] + shared_sum[tid + stride];
+            shared_sum[tid as usize] = shared_sum[tid as usize] + shared_sum[(tid + stride) as usize];
         }
         sync_cube();
         stride = stride / 2;
@@ -96,10 +96,10 @@ fn absmean_quantize_kernel<F: Float>(
 
     // Compute and store scale (absmean)
     // scale = sum / in_features
-    let scale = shared_sum[0] / F::cast_from(in_features);
+    let scale = shared_sum[0usize] / F::cast_from(in_features);
 
     if tid == 0 {
-        scales[row] = scale;
+        scales[row as usize] = scale;
     }
 
     // Compute inverse scale for quantization (avoid division in loop)
@@ -111,11 +111,11 @@ fn absmean_quantize_kernel<F: Float>(
     // Phase 2: Quantize each element to ternary
     i = tid;
     while i < in_features {
-        let val = weight[row_start + i] * inv_scale;
+        let val = weight[(row_start + i) as usize] * inv_scale;
 
         // Round to nearest integer, then clamp to {-1, 0, +1}
         // round(val) = floor(val + 0.5) for positive, ceil(val - 0.5) for negative
-        let rounded = floor(val + F::new(0.5));
+        let rounded = F::floor(val + F::new(0.5));
 
         // Clamp to {-1, 0, +1}
         let clamped: i32 = select(
@@ -124,7 +124,7 @@ fn absmean_quantize_kernel<F: Float>(
             select(rounded > F::new(0.5), 1, 0),
         );
 
-        quantized[row_start + i] = clamped;
+        quantized[(row_start + i) as usize] = clamped;
         i = i + block_size;
     }
 }
@@ -142,15 +142,15 @@ fn ternary_dequantize_kernel<F: Float>(
     in_features: u32,
     num_elements: u32,
 ) {
-    let idx = ABSOLUTE_POS;
+    let idx = ABSOLUTE_POS as u32;
 
     if idx >= num_elements {
-        return;
+        terminate!();
     }
 
     let row = idx / in_features;
-    let scale = scales[row];
-    let trit = ternary[idx];
+    let scale = scales[row as usize];
+    let trit = ternary[idx as usize];
 
     // Convert trit (-1, 0, +1) to float and multiply by scale
     // Using conditionals since CubeCL doesn't have direct i32->float cast
@@ -160,7 +160,7 @@ fn ternary_dequantize_kernel<F: Float>(
         select(trit == -1, F::new(-1.0), F::new(0.0)),
     );
 
-    output[idx] = trit_f * scale;
+    output[idx as usize] = trit_f * scale;
 }
 
 /// Optimized ternary matrix multiplication kernel.
@@ -190,14 +190,14 @@ fn ternary_matmul_kernel<F: Float>(
     let out_idx = out_tile * TILE_SIZE + out_local;
 
     if batch_idx >= batch_size || out_idx >= out_features {
-        return;
+        terminate!();
     }
 
     let input_base = batch_idx * in_features;
     let weight_base = out_idx * in_features;
 
     // Shared memory for input tile (collaborative loading)
-    let mut input_tile = SharedMemory::<F>::new(TILE_SIZE);
+    let mut input_tile = SharedMemory::<F>::new(TILE_SIZE as usize);
 
     let mut acc = F::new(0.0);
 
@@ -210,9 +210,9 @@ fn ternary_matmul_kernel<F: Float>(
         // Collaborative load of input tile
         let in_idx = tile_start + out_local;
         if in_idx < in_features {
-            input_tile[out_local] = input[input_base + in_idx];
+            input_tile[out_local as usize] = input[(input_base + in_idx) as usize];
         } else {
-            input_tile[out_local] = F::new(0.0);
+            input_tile[out_local as usize] = F::new(0.0);
         }
         sync_cube();
 
@@ -220,8 +220,8 @@ fn ternary_matmul_kernel<F: Float>(
         for i in 0u32..TILE_SIZE {
             let global_in_idx = tile_start + i;
             if global_in_idx < in_features {
-                let trit = weights[weight_base + global_in_idx];
-                let x = input_tile[i];
+                let trit = weights[(weight_base + global_in_idx) as usize];
+                let x = input_tile[i as usize];
 
                 // Ternary multiply-accumulate without multiplication
                 // trit == +1: add x
@@ -234,8 +234,8 @@ fn ternary_matmul_kernel<F: Float>(
     }
 
     // Apply scale factor
-    let scale = scales[out_idx];
-    output[batch_idx * out_features + out_idx] = acc * scale;
+    let scale = scales[out_idx as usize];
+    output[(batch_idx * out_features + out_idx) as usize] = acc * scale;
 }
 
 /// Packed ternary matrix multiplication kernel.
@@ -260,29 +260,28 @@ fn packed_ternary_matmul_kernel<F: Float>(
     let out_idx = out_tile * TILE_SIZE + out_local;
 
     if batch_idx >= batch_size || out_idx >= out_features {
-        return;
+        terminate!();
     }
 
     let input_base = batch_idx * in_features;
-    let trits_per_word: u32 = 16; // 2 bits per trit, 32 bits per u32
-    let packed_per_row = (in_features + trits_per_word - 1) / trits_per_word;
+    let packed_per_row = (in_features + 15) / 16; // 16 trits per u32 (2 bits each)
     let weight_base = out_idx * packed_per_row;
 
     let mut acc = F::new(0.0);
 
     // Process packed weights
     for pack_idx in 0u32..packed_per_row {
-        let packed = packed_weights[weight_base + pack_idx];
+        let packed = packed_weights[(weight_base + pack_idx) as usize];
 
         // Unpack 16 trits (2 bits each)
         // Encoding: 00 = 0, 01 = +1, 10 = -1
-        for i in 0u32..trits_per_word {
-            let in_idx = pack_idx * trits_per_word + i;
+        for i in 0u32..16u32 {
+            let in_idx = pack_idx * 16 + i;
             if in_idx < in_features {
                 // Extract 2-bit trit: (packed >> (i * 2)) & 0x3
                 let shift = i * 2;
                 let trit_bits = (packed >> shift) & 0x3u32;
-                let x = input[input_base + in_idx];
+                let x = input[(input_base + in_idx) as usize];
 
                 // Decode and accumulate
                 // 01 (+1): add
@@ -297,8 +296,8 @@ fn packed_ternary_matmul_kernel<F: Float>(
         }
     }
 
-    let scale = scales[out_idx];
-    output[batch_idx * out_features + out_idx] = acc * scale;
+    let scale = scales[out_idx as usize];
+    output[(batch_idx * out_features + out_idx) as usize] = acc * scale;
 }
 
 /// BitLinear forward pass kernel.
@@ -321,7 +320,6 @@ fn bitlinear_forward_kernel<F: Float>(
     batch_size: u32,
     in_features: u32,
     out_features: u32,
-    eps: F,
 ) {
     // Each block handles one (batch, out_idx) pair
     let batch_idx = CUBE_POS_Y;
@@ -331,14 +329,14 @@ fn bitlinear_forward_kernel<F: Float>(
     let out_idx = out_tile * TILE_SIZE + (tid % TILE_SIZE);
 
     if batch_idx >= batch_size || out_idx >= out_features {
-        return;
+        terminate!();
     }
 
     let input_base = batch_idx * in_features;
 
     // Shared memory for reductions and normalized input
-    let mut shared = SharedMemory::<F>::new(256);
-    let mut normed_cache = SharedMemory::<F>::new(MAX_SHARED_ELEMENTS);
+    let mut shared = SharedMemory::<F>::new(256usize);
+    let mut normed_cache = SharedMemory::<F>::new(MAX_SHARED_ELEMENTS as usize);
 
     // ========================================
     // Step 1: LayerNorm - compute mean
@@ -346,22 +344,22 @@ fn bitlinear_forward_kernel<F: Float>(
     let mut local_sum = F::new(0.0);
     let mut i = tid;
     while i < in_features {
-        local_sum = local_sum + input[input_base + i];
+        local_sum = local_sum + input[(input_base + i) as usize];
         i = i + block_size;
     }
-    shared[tid] = local_sum;
+    shared[tid as usize] = local_sum;
     sync_cube();
 
     // Tree reduction for mean
     let mut stride: u32 = 128;
     while stride > 0 {
         if tid < stride && (tid + stride) < block_size {
-            shared[tid] = shared[tid] + shared[tid + stride];
+            shared[tid as usize] = shared[tid as usize] + shared[(tid + stride) as usize];
         }
         sync_cube();
         stride = stride / 2;
     }
-    let mean = shared[0] / F::cast_from(in_features);
+    let mean = shared[0usize] / F::cast_from(in_features);
     sync_cube();
 
     // ========================================
@@ -370,24 +368,25 @@ fn bitlinear_forward_kernel<F: Float>(
     local_sum = F::new(0.0);
     i = tid;
     while i < in_features {
-        let diff = input[input_base + i] - mean;
+        let diff = input[(input_base + i) as usize] - mean;
         local_sum = local_sum + diff * diff;
         i = i + block_size;
     }
-    shared[tid] = local_sum;
+    shared[tid as usize] = local_sum;
     sync_cube();
 
     // Tree reduction for variance
     stride = 128;
     while stride > 0 {
         if tid < stride && (tid + stride) < block_size {
-            shared[tid] = shared[tid] + shared[tid + stride];
+            shared[tid as usize] = shared[tid as usize] + shared[(tid + stride) as usize];
         }
         sync_cube();
         stride = stride / 2;
     }
-    let var = shared[0] / F::cast_from(in_features);
-    let inv_std = F::new(1.0) / sqrt(var + eps);
+    let var = shared[0usize] / F::cast_from(in_features);
+    let eps = F::new(1e-5);
+    let inv_std = F::new(1.0) / F::sqrt(var + eps);
     sync_cube();
 
     // ========================================
@@ -397,8 +396,8 @@ fn bitlinear_forward_kernel<F: Float>(
     // Beyond that, we recompute on-the-fly
     i = tid;
     while i < in_features && i < MAX_SHARED_ELEMENTS {
-        let norm = (input[input_base + i] - mean) * inv_std;
-        normed_cache[i] = norm * ln_weight[i] + ln_bias[i];
+        let norm = (input[(input_base + i) as usize] - mean) * inv_std;
+        normed_cache[i as usize] = norm * ln_weight[i as usize] + ln_bias[i as usize];
         i = i + block_size;
     }
     sync_cube();
@@ -413,14 +412,14 @@ fn bitlinear_forward_kernel<F: Float>(
     while i < in_features {
         // Get normalized input value
         let normed_val: F = if i < MAX_SHARED_ELEMENTS {
-            normed_cache[i]
+            normed_cache[i as usize]
         } else {
             // Recompute for values beyond shared memory cache
-            let norm = (input[input_base + i] - mean) * inv_std;
-            norm * ln_weight[i] + ln_bias[i]
+            let norm = (input[(input_base + i) as usize] - mean) * inv_std;
+            norm * ln_weight[i as usize] + ln_bias[i as usize]
         };
 
-        let trit = weights[weight_base + i];
+        let trit = weights[(weight_base + i) as usize];
 
         // Ternary accumulate
         acc = select(trit == 1, acc + normed_val, select(trit == -1, acc - normed_val, acc));
@@ -428,11 +427,11 @@ fn bitlinear_forward_kernel<F: Float>(
     }
 
     // Apply weight scale
-    let scale = weight_scales[out_idx];
+    let scale = weight_scales[out_idx as usize];
 
     // Only first thread per output writes (avoid race conditions)
     if tid % TILE_SIZE == out_idx % TILE_SIZE {
-        output[batch_idx * out_features + out_idx] = acc * scale;
+        output[(batch_idx * out_features + out_idx) as usize] = acc * scale;
     }
 }
 
@@ -461,7 +460,7 @@ pub fn has_cuda_support() -> bool {
 /// # Errors
 ///
 /// Returns error if tensor is not on CUDA device.
-pub fn absmean_quantize(weight: &Tensor) -> Result<(Tensor, Tensor)> {
+pub fn absmean_quantize(weight: &Tensor) -> std::result::Result<(Tensor, Tensor), BitNetError> {
     if !weight.device().is_cuda() {
         return Err(BitNetError::FeatureNotAvailable(
             "absmean_quantize requires CUDA device".into(),
@@ -525,9 +524,9 @@ pub fn absmean_quantize(weight: &Tensor) -> Result<(Tensor, Tensor)> {
 /// # Returns
 ///
 /// Dequantized float tensor [out_features, in_features]
-pub fn ternary_dequantize(ternary: &Tensor, scales: &Tensor) -> Result<Tensor> {
-    let device = ternary.device();
-    let (out_features, in_features) = ternary.dims2()?;
+pub fn ternary_dequantize(ternary: &Tensor, scales: &Tensor) -> std::result::Result<Tensor, BitNetError> {
+    let _device = ternary.device();
+    let (out_features, _in_features) = ternary.dims2()?;
 
     // Convert ternary i32 to f32, multiply by broadcasted scales
     let ternary_f32 = ternary.to_dtype(DType::F32)?;
@@ -550,7 +549,7 @@ pub fn ternary_dequantize(ternary: &Tensor, scales: &Tensor) -> Result<Tensor> {
 /// # Errors
 ///
 /// Returns error if CUDA operation fails.
-pub fn ternary_matmul_gpu(input: &Tensor, weight: &TernaryWeight) -> Result<Tensor> {
+pub fn ternary_matmul_gpu(input: &Tensor, weight: &TernaryWeight) -> std::result::Result<Tensor, BitNetError> {
     let device = input.device();
 
     // Dequantize weights and perform standard matmul
@@ -581,8 +580,8 @@ pub fn ternary_matmul_raw(
     input: &Tensor,
     ternary_weights: &Tensor,
     scales: &Tensor,
-) -> Result<Tensor> {
-    let device = input.device();
+) -> std::result::Result<Tensor, BitNetError> {
+    let _device = input.device();
 
     // Dequantize and compute
     let dequant = ternary_dequantize(ternary_weights, scales)?;
@@ -603,7 +602,7 @@ pub fn ternary_matmul_raw(
 /// # Returns
 ///
 /// Packed tensor [out_features, ceil(in_features/16)] as u32
-pub fn pack_ternary_weights(ternary: &Tensor) -> Result<Tensor> {
+pub fn pack_ternary_weights(ternary: &Tensor) -> std::result::Result<Tensor, BitNetError> {
     let (out_features, in_features) = ternary.dims2()?;
     let device = ternary.device();
 
@@ -657,10 +656,10 @@ pub fn packed_ternary_matmul(
     packed_weights: &Tensor,
     scales: &Tensor,
     in_features: usize,
-) -> Result<Tensor> {
-    let device = input.device();
-    let batch_size = input.dims()[0];
-    let out_features = packed_weights.dims()[0];
+) -> std::result::Result<Tensor, BitNetError> {
+    let _device = input.device();
+    let _batch_size = input.dims()[0];
+    let _out_features = packed_weights.dims()[0];
 
     // Unpack and compute (for correctness - full CubeCL version avoids unpacking)
     let ternary = unpack_ternary_weights(packed_weights, in_features)?;
@@ -679,7 +678,7 @@ pub fn packed_ternary_matmul(
 /// # Returns
 ///
 /// Ternary tensor [out_features, in_features] as i32
-pub fn unpack_ternary_weights(packed: &Tensor, in_features: usize) -> Result<Tensor> {
+pub fn unpack_ternary_weights(packed: &Tensor, in_features: usize) -> std::result::Result<Tensor, BitNetError> {
     let (out_features, packed_per_row) = packed.dims2()?;
     let device = packed.device();
 
@@ -735,8 +734,8 @@ pub fn bitlinear_forward(
     ln_weight: &Tensor,
     ln_bias: &Tensor,
     config: &BitNetConfig,
-) -> Result<Tensor> {
-    let device = input.device();
+) -> std::result::Result<Tensor, BitNetError> {
+    let _device = input.device();
     let eps = config.eps;
 
     // For now, use separate operations
