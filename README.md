@@ -1,5 +1,10 @@
 # bitnet-quantize
 
+<!-- FLEET-BADGES:BEGIN -->
+[![CI](https://github.com/tzervas/bitnet-quantize/actions/workflows/fleet-ci.yml/badge.svg?branch=main)](https://github.com/tzervas/bitnet-quantize/actions/workflows/fleet-ci.yml?query=branch%3Amain)
+[![Security](https://github.com/tzervas/bitnet-quantize/actions/workflows/fleet-security.yml/badge.svg?branch=main)](https://github.com/tzervas/bitnet-quantize/actions/workflows/fleet-security.yml?query=branch%3Amain)
+<!-- FLEET-BADGES:END -->
+
 Microsoft BitNet b1.58 implementation in Rust with ternary weight quantization.
 
 [![Crates.io](https://img.shields.io/crates/v/bitnet-quantize.svg)](https://crates.io/crates/bitnet-quantize)
